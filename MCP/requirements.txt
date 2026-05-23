@@ -1,0 +1,4 @@
+mcp>=1.0.0
+pyodbc>=5.0.0
+oracledb>=2.0.0
+python-dotenv>=1.0.0

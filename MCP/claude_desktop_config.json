@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "data-validator": {
+      "command": "python",
+      "args": ["C:/Users/YOU/path/to/MCP/server.py"],
+      "env": {}
+    }
+  }
+}

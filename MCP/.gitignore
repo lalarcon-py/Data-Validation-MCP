@@ -1,0 +1,30 @@
+# Credentials — never commit these
+.env
+*.wallet
+wallet/
+tnsnames.ora
+sqlnet.ora
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Oracle client files
+*.ora
+instantclient/
+
+# IDE / OS noise
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+
+# Logs
+*.log
