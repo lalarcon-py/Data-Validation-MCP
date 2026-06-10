@@ -1,12 +1,12 @@
-# MCP Data Validation Server — Action Plan
+# MCP Data Validation Server - Action Plan
 
 ## Project Overview
 
-A custom **Model Context Protocol (MCP) server** that connects Claude to a database layer for data validation and replication checks. Claude becomes the interface — you can ask natural language questions like *"compare row counts for the Orders table between source and target"* and Claude calls your tools to get real answers.
+A custom **Model Context Protocol (MCP) server** that connects Claude to a database layer for data validation and replication checks. Claude becomes the interface - you can ask natural language questions like *"compare row counts for the Orders table between source and target"* and Claude calls your tools to get real answers.
 
 **Transport:** stdio (local, Claude Desktop)
 **Language:** Python
-**Database:** Generic — configurable via `.env` (supports SQL Server and Oracle out of the box)
+**Database:** Generic - configurable via `.env` (supports SQL Server and Oracle out of the box)
 
 ---
 
@@ -14,11 +14,11 @@ A custom **Model Context Protocol (MCP) server** that connects Claude to a datab
 
 To keep this project GA and portfolio-safe, we'll use a **fictional e-commerce dataset** as the demo context:
 
-- **Source DB** — a simulated "production" database
-- **Target DB** — a simulated "replica" or "warehouse" database
-- **Tables** — `customers`, `orders`, `order_items`, `products`
+- **Source DB** - a simulated "production" database
+- **Target DB** - a simulated "replica" or "warehouse" database
+- **Tables** - `customers`, `orders`, `order_items`, `products`
 
-Both databases can be run locally using **SQL Server Express** (free) or **SQLite** for zero-setup demos. Connection names in code are always `"source"` and `"target"` — never environment-specific names.
+Both databases can be run locally using **SQL Server Express** (free) or **SQLite** for zero-setup demos. Connection names in code are always `"source"` and `"target"` - never environment-specific names.
 
 ---
 
@@ -26,7 +26,7 @@ Both databases can be run locally using **SQL Server Express** (free) or **SQLit
 
 ```
 MCP/
-├── server.py                  # Entry point — MCP server definition
+├── server.py                  # Entry point - MCP server definition
 ├── config.py                  # Loads named connections from .env
 ├── tools/
 │   ├── __init__.py
@@ -43,12 +43,12 @@ MCP/
 ├── .env.example               # Template for anyone cloning the repo
 ├── requirements.txt
 ├── README.md
-└── claude_desktop_config.json # Drop-in config snippet for Claude Desktop
+└── claude_desktop_config.json
 ```
 
 ---
 
-## Phase 1 — Project Scaffold
+## Phase 1 - Project Scaffold
 
 - [ ] Create the folder structure above
 - [ ] Write `requirements.txt`:
@@ -76,7 +76,7 @@ MCP/
 
 ---
 
-## Phase 2 — Demo Data Setup
+## Phase 2 - Demo Data Setup
 
 - [ ] Write `seed/seed_demo_data.sql` to create both source and target databases with:
   - `customers (id, name, email, created_at)`
@@ -91,18 +91,18 @@ MCP/
 
 ---
 
-## Phase 3 — Connection Layer
+## Phase 3 - Connection Layer
 
-- [ ] Build `connections/sqlserver.py` — `pyodbc` connection factory keyed by name (`"source"`, `"target"`)
-- [ ] Build `connections/oracle.py` — `python-oracledb` thin client factory (no Instant Client required)
-- [ ] Build `config.py` — reads `.env`, returns the right factory based on driver type
+- [ ] Build `connections/sqlserver.py` - `pyodbc` connection factory keyed by name (`"source"`, `"target"`)
+- [ ] Build `connections/oracle.py` - `python-oracledb` thin client factory (no Instant Client required)
+- [ ] Build `config.py` - reads `.env`, returns the right factory based on driver type
 - [ ] Connection objects are created fresh per tool call (no persistent pool needed for stdio transport)
 
 ---
 
-## Phase 4 — Core Tools
+## Phase 4 - Core Tools
 
-Build in this order — each one is independently testable before moving to the next.
+Build in this order - each one is independently testable before moving to the next.
 
 ### 4.1 `test_connection(connection_name)`
 - Attempts to open a connection and run `SELECT 1`
@@ -136,12 +136,12 @@ Build in this order — each one is independently testable before moving to the 
 
 ---
 
-## Phase 5 — MCP Server Wiring
+## Phase 5 - MCP Server Wiring
 
 - [ ] Register all tools in `server.py` using the `mcp` SDK
 - [ ] Define typed input schemas for each tool (Claude uses these to know what parameters to pass)
-- [ ] All tools return plain dicts — MCP serializes them to JSON for Claude automatically
-- [ ] Error handling returns clean, readable error messages — **never raw stack traces** (Claude reads the output directly)
+- [ ] All tools return plain dicts - MCP serializes them to JSON for Claude automatically
+- [ ] Error handling returns clean, readable error messages - **never raw stack traces** (Claude reads the output directly)
 - [ ] Example tool registration pattern:
   ```python
   @mcp.tool()
@@ -152,7 +152,7 @@ Build in this order — each one is independently testable before moving to the 
 
 ---
 
-## Phase 6 — Claude Desktop Integration
+## Phase 6 - Claude Desktop Integration
 
 - [ ] Write `claude_desktop_config.json` snippet:
   ```json
@@ -172,7 +172,7 @@ Build in this order — each one is independently testable before moving to the 
 
 ---
 
-## Phase 7 — Polish (Portfolio-Ready)
+## Phase 7 - Polish (Portfolio-Ready)
 
 - [ ] Write `README.md` with:
   - Architecture diagram (ASCII or image)
@@ -203,4 +203,6 @@ Once the server is running, these should all work in Claude Desktop:
 
 ## What "Done" Looks Like
 
-You open Claude Desktop, ask a natural language question about your data, and Claude calls your MCP tools, hits your local databases, and returns a real answer — no plugins, no custom UI, no manual SQL. The entire codebase is generic, documented, and safe to share publicly.
+You open Claude Desktop, ask a natural language question about your data, and Claude calls your MCP tools, hits your local databases, and returns a real answer - no plugins, no custom UI, no manual SQL. The entire codebase is generic, documented, and safe to share publicly.
+
+CO-AUTHORED BY CLAUDE CODE
