@@ -1,18 +1,26 @@
-from config import get_connection
+from config import get_connection, get_dialect
 
 
 def list_tables(connection_name: str) -> dict:
     try:
         conn = get_connection(connection_name)
+        dialect = get_dialect(connection_name)
         cursor = conn.cursor()
-        # USER_TABLES works for both Oracle and SQL Server (via INFORMATION_SCHEMA fallback)
-        try:
+
+        if dialect == "oracle":
             cursor.execute("SELECT table_name FROM user_tables ORDER BY table_name")
-        except Exception:
+        elif dialect == "postgres":
+            cursor.execute("""
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema = current_schema() AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+            """)
+        else:
             cursor.execute("""
                 SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
                 WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME
             """)
+
         tables = [row[0] for row in cursor.fetchall()]
         conn.close()
         return {"connection": connection_name, "tables": tables, "count": len(tables)}

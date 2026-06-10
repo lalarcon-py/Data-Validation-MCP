@@ -1,101 +1,74 @@
 # Tool Reference
 
-All tools are registered in `server.py` and exposed to Claude via the MCP protocol. Each tool returns a plain dict — MCP serializes it to JSON automatically. Errors are returned as `{"error": "<message>"}` rather than stack traces.
+All tools return a plain dict. Errors come back as `{"error": "..."}` so Claude can read them and explain what went wrong.
 
 ---
 
 ## test_connection
 
-**Description:** Test connectivity to a named database by opening a connection and running `SELECT 1`.
+Tests that a connection is alive by running a simple query.
 
-**Parameters:**
+| Param | Type | Description |
+|---|---|---|
+| `connection_name` | string | "source" or "target" |
 
-| Name | Type | Description |
-|------|------|-------------|
-| `connection_name` | string | `"source"` or `"target"` |
-
-**Example response (success):**
 ```json
-{
-  "connection": "source",
-  "success": true,
-  "latency_ms": 4.21
-}
-```
-
-**Example response (failure):**
-```json
-{
-  "connection": "target",
-  "success": false,
-  "latency_ms": 10003.1,
-  "error": "Login timeout expired"
-}
+{ "connection": "source", "success": true, "latency_ms": 42.1 }
 ```
 
 ---
 
 ## list_tables
 
-**Description:** Return all user-defined table names in the schema for a given connection.
+Lists all user-defined tables in the schema.
 
-**Parameters:**
+| Param | Type | Description |
+|---|---|---|
+| `connection_name` | string | "source" or "target" |
 
-| Name | Type | Description |
-|------|------|-------------|
-| `connection_name` | string | `"source"` or `"target"` |
-
-**Example response:**
 ```json
-{
-  "connection": "source",
-  "tables": ["customers", "order_items", "orders", "products"],
-  "count": 4
-}
+{ "connection": "source", "tables": ["customers", "orders"], "count": 2 }
 ```
 
 ---
 
 ## get_row_count
 
-**Description:** Return the row count for a single table on one connection.
+Row count for one table on one connection.
 
-**Parameters:**
-
-| Name | Type | Description |
-|------|------|-------------|
+| Param | Type | Description |
+|---|---|---|
 | `table` | string | Table name |
-| `connection_name` | string | `"source"` or `"target"` |
-
-**Example response:**
-```json
-{
-  "connection": "source",
-  "table": "orders",
-  "row_count": 5
-}
-```
+| `connection_name` | string | "source" or "target" |
 
 ---
 
 ## compare_row_counts
 
-**Description:** Compare row counts for a table between source and target. Highlights replication lag or missing rows.
+Side-by-side row count for a table across both connections.
 
-**Parameters:**
-
-| Name | Type | Description |
-|------|------|-------------|
+| Param | Type | Description |
+|---|---|---|
 | `table` | string | Table name |
 
-**Example response:**
+```json
+{ "table": "orders", "source_count": 5, "target_count": 4, "delta": 1, "in_sync": false }
+```
+
+---
+
+## compare_all_row_counts
+
+Runs compare_row_counts for every table in source vs target in one call. Good for a quick full health check.
+
+No parameters.
+
 ```json
 {
-  "table": "orders",
-  "source_count": 5,
-  "target_count": 4,
-  "delta": 1,
-  "in_sync": false
+  "tables_checked": 4,
+  "out_of_sync_count": 1,
+  "all_in_sync": false,
+  "results": [...]
 }
 ```
 
@@ -103,42 +76,19 @@ All tools are registered in `server.py` and exposed to Claude via the MCP protoc
 
 ## diff_record
 
-**Description:** Fetch a single row from both source and target by primary key and return a column-level diff.
+Fetches a row from both connections by primary key and shows which columns differ.
 
-**Parameters:**
-
-| Name | Type | Description |
-|------|------|-------------|
+| Param | Type | Description |
+|---|---|---|
 | `table` | string | Table name |
-| `pk_column` | string | Primary key column name (e.g. `"id"`) |
-| `pk_value` | string | Primary key value to look up |
+| `pk_column` | string | Primary key column (e.g. "id") |
+| `pk_value` | string | Value to look up |
 
-**Example response (rows differ):**
 ```json
 {
-  "table": "orders",
-  "pk_column": "id",
-  "pk_value": "1001",
-  "source_found": true,
-  "target_found": true,
-  "columns_differ": ["status"],
-  "diff": {
-    "status": { "source": "completed", "target": "shipped" }
-  },
-  "identical": false
-}
-```
-
-**Example response (row missing from target):**
-```json
-{
-  "table": "orders",
-  "pk_column": "id",
-  "pk_value": "1005",
   "source_found": true,
   "target_found": false,
   "columns_differ": [],
-  "diff": {},
   "identical": false
 }
 ```
@@ -147,63 +97,131 @@ All tools are registered in `server.py` and exposed to Claude via the MCP protoc
 
 ## validate_not_null
 
-**Description:** Count NULL values per specified column in a table. Useful for catching data quality issues before or after migration.
+Counts nulls in specified columns.
 
-**Parameters:**
-
-| Name | Type | Description |
-|------|------|-------------|
+| Param | Type | Description |
+|---|---|---|
 | `table` | string | Table name |
-| `columns` | list[string] | Column names to check |
-| `connection_name` | string | `"source"` or `"target"` |
+| `columns` | list | Column names to check |
+| `connection_name` | string | "source" or "target" |
 
-**Example response:**
 ```json
-{
-  "connection": "source",
-  "table": "customers",
-  "columns_checked": ["email", "name"],
-  "nulls_found": { "email": 1 },
-  "any_nulls": true
-}
+{ "nulls_found": { "email": 1 }, "any_nulls": true }
 ```
 
 ---
 
 ## validate_pk_uniqueness
 
-**Description:** Check for duplicate values in a primary key column. Catches botched upserts or replication errors.
+Checks for duplicate values in a primary key column.
 
-**Parameters:**
-
-| Name | Type | Description |
-|------|------|-------------|
+| Param | Type | Description |
+|---|---|---|
 | `table` | string | Table name |
-| `pk_column` | string | Primary key column to check |
-| `connection_name` | string | `"source"` or `"target"` |
+| `pk_column` | string | Column to check |
+| `connection_name` | string | "source" or "target" |
 
-**Example response (duplicates found):**
+```json
+{ "duplicates": [{ "pk_value": "3", "count": 2 }], "is_unique": false }
+```
+
+---
+
+## get_table_schema
+
+Returns full column definitions for a table.
+
+| Param | Type | Description |
+|---|---|---|
+| `table` | string | Table name |
+| `connection_name` | string | "source" or "target" |
+
 ```json
 {
-  "connection": "target",
-  "table": "order_items",
-  "pk_column": "id",
-  "duplicates": [
-    { "pk_value": "3", "count": 2 }
-  ],
-  "duplicate_count": 1,
-  "is_unique": false
+  "columns": [
+    { "name": "ID", "type": "NUMBER", "nullable": false, "default": null, "position": 1 },
+    { "name": "EMAIL", "type": "VARCHAR2", "nullable": true, "default": null, "position": 3 }
+  ]
 }
 ```
 
-**Example response (clean):**
+---
+
+## compare_table_schemas
+
+Diffs column definitions between source and target for a table.
+
+| Param | Type | Description |
+|---|---|---|
+| `table` | string | Table name |
+
 ```json
 {
-  "connection": "source",
-  "table": "order_items",
-  "pk_column": "id",
-  "duplicates": [],
-  "duplicate_count": 0,
-  "is_unique": true
+  "only_in_source": ["LEGACY_FIELD"],
+  "only_in_target": [],
+  "type_mismatches": [
+    { "column": "STATUS", "differences": { "type": { "source": "VARCHAR2", "target": "CHAR" } } }
+  ],
+  "schemas_match": false
+}
+```
+
+---
+
+## get_constraints
+
+Returns all constraints on a table (PK, FK, unique, check).
+
+| Param | Type | Description |
+|---|---|---|
+| `table` | string | Table name |
+| `connection_name` | string | "source" or "target" |
+
+```json
+{
+  "constraints": [
+    { "name": "SYS_C001", "type": "P", "columns": ["ID"] },
+    { "name": "SYS_C002", "type": "C", "columns": ["EMAIL"], "check_clause": "EMAIL IS NOT NULL" }
+  ]
+}
+```
+
+---
+
+## compare_constraints
+
+Diffs constraints between source and target for a table.
+
+| Param | Type | Description |
+|---|---|---|
+| `table` | string | Table name |
+
+```json
+{
+  "only_in_source": [],
+  "only_in_target": [{ "name": "UQ_EMAIL", "type": "U", "columns": ["EMAIL"] }],
+  "constraints_match": false
+}
+```
+
+---
+
+## execute_query
+
+Runs an arbitrary read-only SELECT query and returns the results. Use this when the other tools don't cover what you need.
+
+| Param | Type | Description |
+|---|---|---|
+| `sql` | string | A SELECT or WITH (CTE) statement |
+| `connection_name` | string | "source" or "target" |
+| `params` | list (optional) | Bind parameters for the query |
+
+```json
+{
+  "row_count": 3,
+  "rows": [
+    { "status": "completed", "count": 3 },
+    { "status": "pending", "count": 1 }
+  ]
 }
 ```

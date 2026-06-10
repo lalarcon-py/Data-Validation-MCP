@@ -1,26 +1,28 @@
 # MCP Data Validation Server
 
-A Python MCP server that connects Claude Desktop to a database layer for data validation and replication checks. Ask natural language questions like *"compare row counts for orders between source and target"* and Claude calls the tools to get real answers — no custom UI, no manual SQL.
+A Python MCP server that hooks Claude Desktop into a database layer so you can run data validation and cross-database comparisons just by asking questions in plain English. No writing SQL by hand, no copy-pasting results. You ask, Claude calls the right tool, you get an answer.
+
+Supports Oracle, PostgreSQL, and SQL Server. Built with the MCP SDK and Python.
 
 ```
-Claude Desktop  ──stdio──►  server.py
-                               ├── inventory tools
-                               ├── comparison tools
-                               └── validation tools
-                                       │
-                          ┌───────────┴────────────┐
-                       demo_source            demo_target
+Claude Desktop  --stdio-->  server.py
+                               |-- inventory (list tables, row counts)
+                               |-- comparison (diff rows and counts)
+                               |-- validation (nulls, duplicate PKs)
+                               |-- schema (columns, constraints, arbitrary queries)
+                                         |
+                           source DB --- target DB
 ```
 
-Built with Python, [MCP SDK](https://github.com/modelcontextprotocol/python-sdk), and [Claude Cowork](https://claude.ai) to accelerate the scaffolding and tool design.
+Built with help from [Claude Cowork](https://claude.ai) for scaffolding and tool design.
 
 ---
 
 ## Prerequisites
 
 - Python 3.11+
-- SQL Server (Express is fine) with ODBC Driver 17
 - Claude Desktop
+- One of: Oracle 19c, PostgreSQL 12+, or SQL Server with ODBC Driver 17
 
 ---
 
@@ -32,57 +34,77 @@ Built with Python, [MCP SDK](https://github.com/modelcontextprotocol/python-sdk)
 pip install -r requirements.txt
 ```
 
-**2. Configure connections**
+**2. Configure your connections**
 
 ```bash
 cp .env.example .env
 ```
 
-Fill in `.env` with your SQL Server credentials. Leave `USER`/`PASSWORD` blank to use Windows Integrated Auth.
+Fill in your credentials. Examples for each database are in `.env.example`. For Oracle you need a DSN, for Postgres you need host/port/name, for SQL Server you need the server name and DB name.
 
-For Oracle, set `*_DRIVER=oracle` and add `*_DSN=<host>/<service>`.
+**3. Seed the demo data (optional)**
 
-**3. Seed the demo databases**
+Oracle: run `seed/seed_demo_data.sql` in SQL Developer as SYS with SYSDBA role against orclpdb.
 
-```bash
-sqlcmd -S localhost -i seed/seed_demo_data.sql
-```
-
-This creates `demo_source` and `demo_target` with intentional drift so every tool has something real to find.
+PostgreSQL: create `demo_source` and `demo_target` databases, then run `seed/seed_demo_data_postgres.sql` against each.
 
 **4. Register with Claude Desktop**
 
-Merge `claude_desktop_config.json` into `%APPDATA%\Claude\claude_desktop_config.json`, updating the path to `server.py`. Restart Claude Desktop.
+Add this to `%APPDATA%\Claude\claude_desktop_config.json` (update the path to match your setup):
+
+```json
+{
+  "mcpServers": {
+    "data-validator": {
+      "command": "C:\\path\\to\\MCP\\venv\\Scripts\\python.exe",
+      "args": ["C:\\path\\to\\MCP\\server.py"]
+    }
+  }
+}
+```
+
+Restart Claude Desktop and the tools will be available.
+
+---
+
+## What you can ask Claude
+
+```
+"Test both connections"
+"List the tables in source"
+"Compare row counts for all tables"
+"What columns are in the orders table on source?"
+"Are there any schema differences in the orders table between source and target?"
+"What constraints does the customers table have?"
+"Are there any constraint differences between source and target for order_items?"
+"Show me what's different about order ID 1004 between source and target"
+"Check customers for null emails on source"
+"Are there any duplicate PKs in order_items on target?"
+"Run this query against source: SELECT status, COUNT(*) FROM orders GROUP BY status"
+```
 
 ---
 
 ## Tools
 
-See [TOOLS.md](TOOLS.md) for the full reference. Quick list:
-
-- `test_connection` — smoke test for a named connection
-- `list_tables` — discover what tables exist
-- `get_row_count` — row count for one table on one connection
-- `compare_row_counts` — side-by-side count with delta
-- `diff_record` — column-level diff for a single row by PK
-- `validate_not_null` — detect nulls in specified columns
-- `validate_pk_uniqueness` — detect duplicate PKs
-
----
-
-## Example prompts
-
-```
-"Test the connection to both source and target"
-"List all tables in the source database"
-"Compare row counts for the orders table"
-"Show me any differences in order ID 1004 between source and target"
-"Check the customers table for null emails on source"
-"Are there any duplicate primary keys in order_items on target?"
-```
+See [TOOLS.md](TOOLS.md) for the full reference with parameters and example outputs.
 
 ---
 
 ## Swapping in your own databases
 
-Update `.env` with real connection strings and point Claude at your actual tables. No code changes needed — table and column names are all passed as parameters.
+Update `.env` with your real connection strings. Table and column names are all passed as parameters so nothing in the code is hardcoded to the demo schema.
+
+---
+
+## Database support
+
+| Feature | Oracle | PostgreSQL | SQL Server |
+|---|---|---|---|
+| Connection test | Yes | Yes | Yes |
+| List tables | Yes | Yes | Yes |
+| Row counts | Yes | Yes | Yes |
+| Record diff | Yes | Yes | Yes |
+| Schema inspection | Yes | Yes | Yes |
+| Constraint inspection | Yes | Yes | Yes |
+| Arbitrary queries | Yes | Yes | Yes |
