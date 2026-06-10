@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "data-validator": {
+      "command": "C:/Users/YOU/path/to/venv/Scripts/python.exe",
+      "args": ["C:/Users/YOU/path/to/server.py"]
+    }
+  }
+}

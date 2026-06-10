@@ -5,6 +5,12 @@ wallet/
 tnsnames.ora
 sqlnet.ora
 
+# Local config with machine-specific paths — use claude_desktop_config.example.json as the template
+claude_desktop_config.json
+
+# Planning docs (internal only)
+MCP_Action_Plan.md
+
 # Python
 __pycache__/
 *.pyc

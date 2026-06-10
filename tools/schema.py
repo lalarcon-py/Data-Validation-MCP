@@ -1,9 +1,13 @@
 from config import get_connection, get_dialect
 from tools.dialect import normalize, query_to_dicts, placeholder
+from tools.security import validate_identifiers, MAX_QUERY_ROWS
 
 
 def get_table_schema(table: str, connection_name: str) -> dict:
     """Returns column definitions for a table: name, type, nullable, default, position."""
+    err = validate_identifiers(table=table)
+    if err:
+        return {"error": err, "connection": connection_name, "table": table}
     try:
         dialect = get_dialect(connection_name)
         conn = get_connection(connection_name)
@@ -126,6 +130,9 @@ def compare_table_schemas(table: str) -> dict:
 
 def get_constraints(table: str, connection_name: str) -> dict:
     """Returns all constraints on a table: primary keys, foreign keys, unique, check."""
+    err = validate_identifiers(table=table)
+    if err:
+        return {"error": err, "connection": connection_name, "table": table}
     try:
         dialect = get_dialect(connection_name)
         conn = get_connection(connection_name)
@@ -237,39 +244,62 @@ def compare_constraints(table: str) -> dict:
 
 
 def execute_query(sql: str, connection_name: str, params: list | None = None) -> dict:
-    """Runs a read-only SELECT query and returns the results as a list of rows.
-    Only SELECT statements are allowed. This is a guardrail, not a security boundary.
+    """Runs a read-only SELECT query and returns up to MAX_QUERY_ROWS rows.
+    Only SELECT and WITH (CTE) statements are allowed.
+
+    Two layers of protection against writes:
+      1. Keyword blocklist check before the query runs.
+      2. Transaction rollback after execution as a belt-and-suspenders backstop.
 
     Placeholder syntax by dialect:
-      Oracle:     :1, :2, :3 ...
+      Oracle:     :1, :2, :3
       PostgreSQL: %s
       SQL Server: ?
     """
+    # Layer 1: keyword check on normalized SQL (strips whitespace and comments)
+    normalized = " ".join(sql.split()).upper()
+    blocked = ["DROP", "DELETE", "UPDATE", "INSERT", "CREATE", "ALTER", "TRUNCATE", "MERGE", "EXEC", "EXECUTE"]
+    for word in blocked:
+        if word in normalized.split() or normalized.startswith(word):
+            return {"error": f"Write operations are not allowed. Blocked keyword: {word}"}
+
+    if not normalized.startswith("SELECT") and not normalized.startswith("WITH"):
+        return {"error": "Only SELECT or WITH (CTE) queries are allowed."}
+
+    conn = None
     try:
-        stripped = sql.strip().upper()
-        blocked = ["DROP", "DELETE", "UPDATE", "INSERT", "CREATE", "ALTER", "TRUNCATE", "MERGE"]
-        for word in blocked:
-            if stripped.startswith(word) or f" {word} " in f" {stripped} ":
-                return {"error": f"Only SELECT queries are allowed. Blocked keyword: {word}"}
-
-        if not stripped.startswith("SELECT") and not stripped.startswith("WITH"):
-            return {"error": "Only SELECT or WITH (CTE) queries are allowed."}
-
         dialect = get_dialect(connection_name)
         conn = get_connection(connection_name)
         cursor = conn.cursor()
 
-        rows = query_to_dicts(cursor, sql, params or None)
-        conn.close()
+        cursor.execute(sql, params) if params else cursor.execute(sql)
+        cols = [d[0].lower() for d in cursor.description]
+        rows = [dict(zip(cols, row)) for row in cursor.fetchmany(MAX_QUERY_ROWS)]
+
+        # Layer 2: rollback anything that somehow slipped through
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+
+        truncated = cursor.fetchone() is not None  # check if there were more rows
 
         return {
             "connection": connection_name,
             "dialect": dialect,
             "row_count": len(rows),
+            "truncated": truncated,
+            "limit": MAX_QUERY_ROWS,
             "rows": rows,
         }
     except Exception as e:
         return {"error": str(e), "connection": connection_name}
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 def execute_query_on_both(

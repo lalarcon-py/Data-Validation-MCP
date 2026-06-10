@@ -1,7 +1,15 @@
 from config import get_connection
+from tools.security import validate_identifiers
 
 
 def validate_not_null(table: str, columns: list[str], connection_name: str) -> dict:
+    err = validate_identifiers(table=table)
+    if err:
+        return {"error": err, "connection": connection_name, "table": table}
+    for col in columns:
+        err = validate_identifiers(column=col)
+        if err:
+            return {"error": err, "connection": connection_name, "table": table}
     try:
         conn = get_connection(connection_name)
         cursor = conn.cursor()
@@ -24,6 +32,9 @@ def validate_not_null(table: str, columns: list[str], connection_name: str) -> d
 
 
 def validate_pk_uniqueness(table: str, pk_column: str, connection_name: str) -> dict:
+    err = validate_identifiers(table=table, pk_column=pk_column)
+    if err:
+        return {"error": err, "connection": connection_name, "table": table}
     try:
         conn = get_connection(connection_name)
         cursor = conn.cursor()

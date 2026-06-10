@@ -1,4 +1,5 @@
 from config import get_connection, get_dialect
+from tools.security import validate_identifiers
 
 
 def list_tables(connection_name: str) -> dict:
@@ -29,6 +30,9 @@ def list_tables(connection_name: str) -> dict:
 
 
 def get_row_count(table: str, connection_name: str) -> dict:
+    err = validate_identifiers(table=table)
+    if err:
+        return {"error": err, "connection": connection_name, "table": table}
     try:
         conn = get_connection(connection_name)
         cursor = conn.cursor()

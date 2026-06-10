@@ -1,6 +1,7 @@
 from config import get_connection, get_dialect
 from tools.inventory import get_row_count
 from tools.dialect import placeholder, limit_one, quote
+from tools.security import validate_identifiers
 
 
 def compare_row_counts(table: str) -> dict:
@@ -96,6 +97,9 @@ def diff_record(table: str, pk_column: str, pk_value: str) -> dict:
     """Fetches a row from both connections by PK and diffs at the column level.
     Each side gets its own dialect-aware query, so Oracle vs Postgres works fine.
     """
+    err = validate_identifiers(table=table, pk_column=pk_column)
+    if err:
+        return {"error": err, "table": table, "pk_column": pk_column, "pk_value": pk_value}
     try:
         src_row = _fetch_row(table, pk_column, pk_value, "source")
         tgt_row = _fetch_row(table, pk_column, pk_value, "target")
